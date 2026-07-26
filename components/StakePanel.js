@@ -8,15 +8,8 @@ import {
   toUnits,
   fromUnits,
 } from "../lib/contracts";
-
-const btnStyle = {
-  padding: "12px 20px",
-  borderRadius: 8,
-  border: "none",
-  fontSize: 15,
-  cursor: "pointer",
-  fontWeight: 600,
-};
+import StatRow from "./StatRow";
+import Seal from "./Seal";
 
 export default function StakePanel() {
   const account = useActiveAccount();
@@ -27,6 +20,7 @@ export default function StakePanel() {
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [ok, setOk] = useState(false);
 
   const zero = "0x0000000000000000000000000000000000000000";
   const addr = account?.address || zero;
@@ -57,78 +51,76 @@ export default function StakePanel() {
     setBusy(true);
     setMessage("");
     sendTx(tx, {
-      onSuccess: () => { setMessage(successMsg); refreshAll(); setBusy(false); },
-      onError: (e) => { setMessage("Hata: " + e.message); setBusy(false); },
+      onSuccess: () => { setOk(true); setMessage(successMsg); refreshAll(); setBusy(false); },
+      onError: (e) => { setOk(false); setMessage(e.message); setBusy(false); },
     });
   }
 
   const approve = () => runTx(
     prepareContractCall({ contract: usdc, method: "approve", params: [ADDRESSES.shieldStaking, amountUnits] }),
-    "Onay verildi, şimdi stake edebilirsiniz."
+    "Approved — you can now stake."
   );
   const stake = () => runTx(
     prepareContractCall({ contract: staking, method: "stake", params: [amountUnits] }),
-    "Stake edildi! ✅"
+    "Staked."
   );
   const withdraw = () => runTx(
     prepareContractCall({ contract: staking, method: "withdraw", params: [amountUnits] }),
-    "Çekim başarılı! ✅ (Not: minimum 1 saat stake süresi şartı var)"
+    "Withdrawal complete. (Minimum 1-hour stake duration applies.)"
   );
   const claim = () => runTx(
     prepareContractCall({ contract: staking, method: "claimReward", params: [] }),
-    "Ödül talep edildi! ✅"
+    "Reward claimed."
   );
   const exit = () => runTx(
     prepareContractCall({ contract: staking, method: "exit", params: [] }),
-    "Tüm stake ve ödül çekildi! ✅"
+    "Fully withdrawn and claimed."
   );
 
   if (!account) {
-    return <p style={{ color: "#888", textAlign: "center", padding: 40 }}>Devam etmek için cüzdanınızı bağlayın.</p>;
+    return <p className="empty-state">Connect your wallet to view the ledger.</p>;
   }
 
-  const apr = aprBps !== undefined ? (Number(aprBps) / 100).toFixed(2) : "-";
+  const apr = aprBps !== undefined ? (Number(aprBps) / 100).toFixed(2) : "—";
 
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto" }}>
-      <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
-        <Stat label="Stake Edilen (USDC)" value={fromUnits(stakedBalance)} />
-        <Stat label="Kazanılan (EURC)" value={fromUnits(earned)} highlight />
-        <Stat label="Tahmini APR" value={apr + "%"} />
-      </div>
+    <div>
+      <StatRow
+        items={[
+          { label: "Staked (USDC)", value: fromUnits(stakedBalance) },
+          { label: "Earned (EURC)", value: fromUnits(earned), tone: "vault" },
+          { label: "Estimated APR", value: apr + "%" },
+        ]}
+      />
 
       <input
         type="number"
-        placeholder="USDC miktarı"
+        placeholder="0.00"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
-        style={{ width: "100%", padding: 14, borderRadius: 8, border: "1px solid #ddd", fontSize: 16, marginBottom: 12, boxSizing: "border-box" }}
+        className="field-input"
       />
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+      <div className="btn-row">
         {needsApproval ? (
-          <button onClick={approve} disabled={busy} style={{ ...btnStyle, background: "#f0a020", color: "#fff", flex: 1 }}>Onayla</button>
+          <button onClick={approve} disabled={busy} className="btn btn--seal">Approve</button>
         ) : (
-          <button onClick={stake} disabled={busy || amountUnits <= 0n} style={{ ...btnStyle, background: "#0066ff", color: "#fff", flex: 1 }}>Stake Et</button>
+          <button onClick={stake} disabled={busy || amountUnits <= 0n} className="btn btn--vault">Stake</button>
         )}
-        <button onClick={withdraw} disabled={busy || amountUnits <= 0n} style={{ ...btnStyle, background: "#eee", color: "#333", flex: 1 }}>Çek</button>
+        <button onClick={withdraw} disabled={busy || amountUnits <= 0n} className="btn btn--ghost">Withdraw</button>
       </div>
 
-      <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={claim} disabled={busy} style={{ ...btnStyle, background: "#00b37e", color: "#fff", flex: 1 }}>Ödülü Talep Et</button>
-        <button onClick={exit} disabled={busy} style={{ ...btnStyle, background: "#333", color: "#fff", flex: 1 }}>Tümünü Çek + Talep Et</button>
+      <div className="btn-row">
+        <button onClick={claim} disabled={busy} className="btn btn--ink">Claim Reward</button>
+        <button onClick={exit} disabled={busy} className="btn btn--ghost">Exit (Withdraw + Claim)</button>
       </div>
 
-      {message && <p style={{ textAlign: "center", marginTop: 16, color: message.includes("Hata") ? "#d33" : "#0a0" }}>{message}</p>}
-    </div>
-  );
-}
-
-function Stat({ label, value, highlight }) {
-  return (
-    <div style={{ flex: 1, minWidth: 120, background: highlight ? "#e6fff5" : "#f5f5f5", padding: 14, borderRadius: 10, textAlign: "center" }}>
-      <div style={{ fontSize: 12, color: "#888" }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 700 }}>{value}</div>
+      {message && (
+        <div className={`notice ${ok ? "notice--ok" : "notice--err"}`}>
+          {ok && <Seal tone="vault" />}
+          <span>{message}</span>
+        </div>
+      )}
     </div>
   );
 }
