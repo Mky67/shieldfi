@@ -94,4 +94,41 @@ export default function StakePanel() {
       <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
         <Stat label="Stake Edilen (USDC)" value={fromUnits(stakedBalance)} />
         <Stat label="Kazanılan (EURC)" value={fromUnits(earned)} highlight />
-        <Stat label="Tahmini APR" value={apr + "%"}
+        <Stat label="Tahmini APR" value={apr + "%"} />
+      </div>
+
+      <input
+        type="number"
+        placeholder="USDC miktarı"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        style={{ width: "100%", padding: 14, borderRadius: 8, border: "1px solid #ddd", fontSize: 16, marginBottom: 12, boxSizing: "border-box" }}
+      />
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+        {needsApproval ? (
+          <button onClick={approve} disabled={busy} style={{ ...btnStyle, background: "#f0a020", color: "#fff", flex: 1 }}>Onayla</button>
+        ) : (
+          <button onClick={stake} disabled={busy || amountUnits <= 0n} style={{ ...btnStyle, background: "#0066ff", color: "#fff", flex: 1 }}>Stake Et</button>
+        )}
+        <button onClick={withdraw} disabled={busy || amountUnits <= 0n} style={{ ...btnStyle, background: "#eee", color: "#333", flex: 1 }}>Çek</button>
+      </div>
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={claim} disabled={busy} style={{ ...btnStyle, background: "#00b37e", color: "#fff", flex: 1 }}>Ödülü Talep Et</button>
+        <button onClick={exit} disabled={busy} style={{ ...btnStyle, background: "#333", color: "#fff", flex: 1 }}>Tümünü Çek + Talep Et</button>
+      </div>
+
+      {message && <p style={{ textAlign: "center", marginTop: 16, color: message.includes("Hata") ? "#d33" : "#0a0" }}>{message}</p>}
+    </div>
+  );
+}
+
+function Stat({ label, value, highlight }) {
+  return (
+    <div style={{ flex: 1, minWidth: 120, background: highlight ? "#e6fff5" : "#f5f5f5", padding: 14, borderRadius: 10, textAlign: "center" }}>
+      <div style={{ fontSize: 12, color: "#888" }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 700 }}>{value}</div>
+    </div>
+  );
+}
