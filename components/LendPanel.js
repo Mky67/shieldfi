@@ -8,15 +8,8 @@ import {
   toUnits,
   fromUnits,
 } from "../lib/contracts";
-
-const btnStyle = {
-  padding: "12px 20px",
-  borderRadius: 8,
-  border: "none",
-  fontSize: 15,
-  cursor: "pointer",
-  fontWeight: 600,
-};
+import StatRow from "./StatRow";
+import Seal from "./Seal";
 
 export default function LendPanel() {
   const account = useActiveAccount();
@@ -27,6 +20,7 @@ export default function LendPanel() {
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [ok, setOk] = useState(false);
 
   const zero = "0x0000000000000000000000000000000000000000";
   const addr = account?.address || zero;
@@ -53,108 +47,81 @@ export default function LendPanel() {
   const amountUnits = toUnits(amount);
   const needsApproval = allowance !== undefined && amountUnits > 0n && allowance < amountUnits;
 
-  async function handleApprove() {
+  function runTx(tx, successMsg) {
     setBusy(true);
     setMessage("");
-    try {
-      const tx = prepareContractCall({
-        contract: usdc,
-        method: "approve",
-        params: [ADDRESSES.shieldLending, amountUnits],
-      });
-      sendTx(tx, {
-        onSuccess: () => { setMessage("Onay verildi, şimdi 'Yatır' butonuna basabilirsiniz."); refetchAllowance(); setBusy(false); },
-        onError: (e) => { setMessage("Hata: " + e.message); setBusy(false); },
-      });
-    } catch (e) {
-      setMessage("Hata: " + e.message);
-      setBusy(false);
-    }
-  }
-
-  async function handleSupply() {
-    if (amountUnits <= 0n) return;
-    setBusy(true);
-    setMessage("");
-    const tx = prepareContractCall({ contract: lending, method: "supply", params: [amountUnits] });
     sendTx(tx, {
-      onSuccess: () => { setMessage("Yatırım başarılı! ✅"); setAmount(""); refreshAll(); setBusy(false); },
-      onError: (e) => { setMessage("Hata: " + e.message); setBusy(false); },
+      onSuccess: () => { setOk(true); setMessage(successMsg); setAmount(""); refreshAll(); setBusy(false); },
+      onError: (e) => { setOk(false); setMessage(e.message); setBusy(false); },
     });
   }
 
-  async function handleWithdraw() {
-    if (amountUnits <= 0n) return;
-    setBusy(true);
-    setMessage("");
-    const tx = prepareContractCall({ contract: lending, method: "withdraw", params: [amountUnits] });
-    sendTx(tx, {
-      onSuccess: () => { setMessage("Çekim başarılı! ✅"); setAmount(""); refreshAll(); setBusy(false); },
-      onError: (e) => { setMessage("Hata: " + e.message); setBusy(false); },
-    });
-  }
-
-  async function handleClaim() {
-    setBusy(true);
-    setMessage("");
-    const tx = prepareContractCall({ contract: lending, method: "claimInterest", params: [] });
-    sendTx(tx, {
-      onSuccess: () => { setMessage("Faiz talep edildi! ✅"); refreshAll(); setBusy(false); },
-      onError: (e) => { setMessage("Hata: " + e.message); setBusy(false); },
-    });
-  }
+  const handleApprove = () => runTx(
+    prepareContractCall({ contract: usdc, method: "approve", params: [ADDRESSES.shieldLending, amountUnits] }),
+    "Approved — you can now supply."
+  );
+  const handleSupply = () => runTx(
+    prepareContractCall({ contract: lending, method: "supply", params: [amountUnits] }),
+    "Supplied to the ledger."
+  );
+  const handleWithdraw = () => runTx(
+    prepareContractCall({ contract: lending, method: "withdraw", params: [amountUnits] }),
+    "Withdrawal complete."
+  );
+  const handleClaim = () => runTx(
+    prepareContractCall({ contract: lending, method: "claimInterest", params: [] }),
+    "Interest claimed."
+  );
 
   if (!account) {
-    return <p style={{ color: "#888", textAlign: "center", padding: 40 }}>Devam etmek için cüzdanınızı bağlayın.</p>;
+    return <p className="empty-state">Connect your wallet to view the ledger.</p>;
   }
 
-  const apr = borrowRateBps !== undefined ? (Number(borrowRateBps) / 100).toFixed(2) : "-";
+  const apr = borrowRateBps !== undefined ? (Number(borrowRateBps) / 100).toFixed(2) : "—";
 
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto" }}>
-      <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
-        <Stat label="Yatırdığınız USDC" value={fromUnits(suppliedBalance)} />
-        <Stat label="Kazanılan Faiz" value={fromUnits(earnedInterest)} highlight />
-        <Stat label="Güncel APR" value={apr + "%"} />
-      </div>
+    <div>
+      <StatRow
+        items={[
+          { label: "Supplied", value: fromUnits(suppliedBalance) },
+          { label: "Earned Interest", value: fromUnits(earnedInterest), tone: "vault" },
+          { label: "Current APR", value: apr + "%" },
+        ]}
+      />
 
       <input
         type="number"
-        placeholder="USDC miktarı"
+        placeholder="0.00"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
-        style={{ width: "100%", padding: 14, borderRadius: 8, border: "1px solid #ddd", fontSize: 16, marginBottom: 12, boxSizing: "border-box" }}
+        className="field-input"
       />
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+      <div className="btn-row">
         {needsApproval ? (
-          <button onClick={handleApprove} disabled={busy || isPending} style={{ ...btnStyle, background: "#f0a020", color: "#fff", flex: 1 }}>
-            {busy ? "..." : "1. Onayla (Approve)"}
+          <button onClick={handleApprove} disabled={busy || isPending} className="btn btn--seal">
+            {busy ? "…" : "1. Approve"}
           </button>
         ) : (
-          <button onClick={handleSupply} disabled={busy || isPending || amountUnits <= 0n} style={{ ...btnStyle, background: "#0066ff", color: "#fff", flex: 1 }}>
-            {busy ? "..." : "Yatır (Supply)"}
+          <button onClick={handleSupply} disabled={busy || isPending || amountUnits <= 0n} className="btn btn--vault">
+            {busy ? "…" : "Supply"}
           </button>
         )}
-        <button onClick={handleWithdraw} disabled={busy || isPending || amountUnits <= 0n} style={{ ...btnStyle, background: "#eee", color: "#333", flex: 1 }}>
-          {busy ? "..." : "Çek (Withdraw)"}
+        <button onClick={handleWithdraw} disabled={busy || isPending || amountUnits <= 0n} className="btn btn--ghost">
+          {busy ? "…" : "Withdraw"}
         </button>
       </div>
 
-      <button onClick={handleClaim} disabled={busy || isPending} style={{ ...btnStyle, background: "#00b37e", color: "#fff", width: "100%" }}>
-        Faizi Talep Et (Claim Interest)
+      <button onClick={handleClaim} disabled={busy || isPending} className="btn btn--ink btn--full">
+        Claim Interest
       </button>
 
-      {message && <p style={{ textAlign: "center", marginTop: 16, color: message.includes("Hata") ? "#d33" : "#0a0" }}>{message}</p>}
-    </div>
-  );
-}
-
-function Stat({ label, value, highlight }) {
-  return (
-    <div style={{ flex: 1, minWidth: 120, background: highlight ? "#e6fff5" : "#f5f5f5", padding: 14, borderRadius: 10, textAlign: "center" }}>
-      <div style={{ fontSize: 12, color: "#888" }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 700 }}>{value}</div>
+      {message && (
+        <div className={`notice ${ok ? "notice--ok" : "notice--err"}`}>
+          {ok && <Seal tone="vault" />}
+          <span>{message}</span>
+        </div>
+      )}
     </div>
   );
 }
