@@ -9,15 +9,8 @@ import {
   toUnits,
   fromUnits,
 } from "../lib/contracts";
-
-const btnStyle = {
-  padding: "12px 20px",
-  borderRadius: 8,
-  border: "none",
-  fontSize: 15,
-  cursor: "pointer",
-  fontWeight: 600,
-};
+import StatRow from "./StatRow";
+import Seal from "./Seal";
 
 export default function BorrowPanel() {
   const account = useActiveAccount();
@@ -30,6 +23,7 @@ export default function BorrowPanel() {
   const [borrowAmount, setBorrowAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [ok, setOk] = useState(false);
 
   const zero = "0x0000000000000000000000000000000000000000";
   const addr = account?.address || zero;
@@ -67,102 +61,92 @@ export default function BorrowPanel() {
     setBusy(true);
     setMessage("");
     sendTx(tx, {
-      onSuccess: () => { setMessage(successMsg); refreshAll(); setBusy(false); },
-      onError: (e) => { setMessage("Hata: " + e.message); setBusy(false); },
+      onSuccess: () => { setOk(true); setMessage(successMsg); refreshAll(); setBusy(false); },
+      onError: (e) => { setOk(false); setMessage(e.message); setBusy(false); },
     });
   }
 
   const approveCollateral = () => runTx(
     prepareContractCall({ contract: eurc, method: "approve", params: [ADDRESSES.shieldLending, collateralUnits] }),
-    "Onay verildi, şimdi teminat yatırabilirsiniz."
+    "Approved — you can now deposit collateral."
   );
   const depositCollateral = () => runTx(
     prepareContractCall({ contract: lending, method: "depositCollateral", params: [collateralUnits] }),
-    "Teminat yatırıldı! ✅"
+    "Collateral deposited."
   );
   const withdrawCollateral = () => runTx(
     prepareContractCall({ contract: lending, method: "withdrawCollateral", params: [collateralUnits] }),
-    "Teminat çekildi! ✅"
+    "Collateral withdrawn."
   );
   const borrow = () => runTx(
     prepareContractCall({ contract: lending, method: "borrow", params: [borrowUnits] }),
-    "USDC borcu alındı! ✅"
+    "USDC borrowed."
   );
   const approveRepay = () => runTx(
     prepareContractCall({ contract: usdc, method: "approve", params: [ADDRESSES.shieldLending, borrowUnits] }),
-    "Onay verildi, şimdi geri ödeyebilirsiniz."
+    "Approved — you can now repay."
   );
   const repay = () => runTx(
     prepareContractCall({ contract: lending, method: "repay", params: [borrowUnits] }),
-    "Geri ödeme yapıldı! ✅"
+    "Repayment complete."
   );
 
   if (!account) {
-    return <p style={{ color: "#888", textAlign: "center", padding: 40 }}>Devam etmek için cüzdanınızı bağlayın.</p>;
+    return <p className="empty-state">Connect your wallet to view the ledger.</p>;
   }
 
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto" }}>
-      <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
-        <Stat label="Teminat (EURC)" value={fromUnits(collateralBalance)} />
-        <Stat label="Borcunuz (USDC)" value={fromUnits(borrowedBalance)} highlight />
-        <Stat label="Maks. Borç" value={fromUnits(maxBorrowable)} />
-      </div>
+    <div>
+      <StatRow
+        items={[
+          { label: "Collateral (EURC)", value: fromUnits(collateralBalance) },
+          { label: "Your Debt (USDC)", value: fromUnits(borrowedBalance), tone: "seal" },
+          { label: "Max Borrowable", value: fromUnits(maxBorrowable) },
+        ]}
+      />
 
-      <SectionTitle>1. Teminat Yatır (EURC)</SectionTitle>
+      <h3 className="section-title">1 · Deposit Collateral (EURC)</h3>
       <input
         type="number"
-        placeholder="EURC miktarı"
+        placeholder="0.00"
         value={collateralAmount}
         onChange={(e) => setCollateralAmount(e.target.value)}
-        style={inputStyle}
+        className="field-input"
       />
-      <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+      <div className="btn-row">
         {needsCollateralApproval ? (
-          <button onClick={approveCollateral} disabled={busy} style={{ ...btnStyle, background: "#f0a020", color: "#fff", flex: 1 }}>Onayla</button>
+          <button onClick={approveCollateral} disabled={busy} className="btn btn--seal">Approve</button>
         ) : (
-          <button onClick={depositCollateral} disabled={busy || collateralUnits <= 0n} style={{ ...btnStyle, background: "#0066ff", color: "#fff", flex: 1 }}>Teminat Yatır</button>
+          <button onClick={depositCollateral} disabled={busy || collateralUnits <= 0n} className="btn btn--vault">Deposit</button>
         )}
-        <button onClick={withdrawCollateral} disabled={busy || collateralUnits <= 0n} style={{ ...btnStyle, background: "#eee", color: "#333", flex: 1 }}>Teminat Çek</button>
+        <button onClick={withdrawCollateral} disabled={busy || collateralUnits <= 0n} className="btn btn--ghost">Withdraw</button>
       </div>
 
-      <SectionTitle>2. Borç Al / Öde (USDC)</SectionTitle>
+      <h3 className="section-title" style={{ marginTop: 20 }}>2 · Borrow / Repay (USDC)</h3>
       <input
         type="number"
-        placeholder="USDC miktarı"
+        placeholder="0.00"
         value={borrowAmount}
         onChange={(e) => setBorrowAmount(e.target.value)}
-        style={inputStyle}
+        className="field-input"
       />
-      <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={borrow} disabled={busy || borrowUnits <= 0n} style={{ ...btnStyle, background: "#0066ff", color: "#fff", flex: 1 }}>Borç Al</button>
+      <div className="btn-row">
+        <button onClick={borrow} disabled={busy || borrowUnits <= 0n} className="btn btn--vault">Borrow</button>
         {needsRepayApproval ? (
-          <button onClick={approveRepay} disabled={busy} style={{ ...btnStyle, background: "#f0a020", color: "#fff", flex: 1 }}>Onayla</button>
+          <button onClick={approveRepay} disabled={busy} className="btn btn--seal">Approve</button>
         ) : (
-          <button onClick={repay} disabled={busy || borrowUnits <= 0n} style={{ ...btnStyle, background: "#eee", color: "#333", flex: 1 }}>Geri Öde</button>
+          <button onClick={repay} disabled={busy || borrowUnits <= 0n} className="btn btn--ghost">Repay</button>
         )}
       </div>
 
-      {message && <p style={{ textAlign: "center", marginTop: 16, color: message.includes("Hata") ? "#d33" : "#0a0" }}>{message}</p>}
+      {message && (
+        <div className={`notice ${ok ? "notice--ok" : "notice--err"}`}>
+          {ok && <Seal tone="seal" />}
+          <span>{message}</span>
+        </div>
+      )}
 
-      <p style={{ fontSize: 12, color: "#999", marginTop: 20, textAlign: "center" }}>
-        LTV %90 · Likidasyon eşiği %95 (USDC/EURC stablecoin çifti olduğu için yüksek LTV)
-      </p>
-    </div>
-  );
-}
-
-const inputStyle = { width: "100%", padding: 14, borderRadius: 8, border: "1px solid #ddd", fontSize: 16, marginBottom: 12, boxSizing: "border-box" };
-
-function SectionTitle({ children }) {
-  return <h3 style={{ fontSize: 14, color: "#666", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>{children}</h3>;
-}
-
-function Stat({ label, value, highlight }) {
-  return (
-    <div style={{ flex: 1, minWidth: 120, background: highlight ? "#fff0e6" : "#f5f5f5", padding: 14, borderRadius: 10, textAlign: "center" }}>
-      <div style={{ fontSize: 12, color: "#888" }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 700 }}>{value}</div>
+      <p className="hint">LTV 90% · Liquidation threshold 95% — stablecoin/stablecoin pair</p>
     </div>
   );
 }
