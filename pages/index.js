@@ -3,11 +3,15 @@ import ConnectBar from "../components/ConnectBar";
 import LendPanel from "../components/LendPanel";
 import BorrowPanel from "../components/BorrowPanel";
 import StakePanel from "../components/StakePanel";
+import BridgePanel from "../components/BridgePanel";
+import GatewayPanel from "../components/GatewayPanel";
 
 const TABS = [
   { key: "lend", label: "Lend" },
   { key: "borrow", label: "Borrow" },
   { key: "stake", label: "Stake" },
+  { key: "bridge", label: "Bridge" },
+  { key: "gateway", label: "Gateway" },
 ];
 
 export default function Home() {
@@ -34,6 +38,8 @@ export default function Home() {
           {activeTab === "lend" && <LendPanel />}
           {activeTab === "borrow" && <BorrowPanel />}
           {activeTab === "stake" && <StakePanel />}
+          {activeTab === "bridge" && <BridgePanel />}
+          {activeTab === "gateway" && <GatewayPanel />}
         </div>
       </div>
     </div>
