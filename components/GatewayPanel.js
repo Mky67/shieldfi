@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useActiveAccount } from "thirdweb/react";
 import { depositToGateway, getGatewayBalance, spendFromGateway } from "../lib/gateway";
 
 const CHAINS = [
@@ -8,12 +7,11 @@ const CHAINS = [
 ];
 
 export default function GatewayPanel() {
-  const account = useActiveAccount();
   const [depositChain, setDepositChain] = useState("Arc_Testnet");
   const [depositAmount, setDepositAmount] = useState("");
+  const [spendFromChain, setSpendFromChain] = useState("Arc_Testnet");
   const [spendToChain, setSpendToChain] = useState("Ethereum_Sepolia");
   const [spendAmount, setSpendAmount] = useState("");
-  const [recipientAddress, setRecipientAddress] = useState("");
 
   const [balance, setBalance] = useState(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
@@ -51,12 +49,11 @@ export default function GatewayPanel() {
   }
 
   async function handleSpend() {
-    const recipient = recipientAddress || account?.address;
-    if (!spendAmount || parseFloat(spendAmount) <= 0 || !recipient) return;
+    if (!spendAmount || parseFloat(spendAmount) <= 0 || spendFromChain === spendToChain) return;
     setBusy(true);
     setMessage("");
     try {
-      await spendFromGateway({ toChain: spendToChain, amount: spendAmount, recipientAddress: recipient });
+      await spendFromGateway({ fromChain: spendFromChain, toChain: spendToChain, amount: spendAmount });
       setOk(true);
       setMessage("Instant transfer complete — USDC available on the destination chain.");
       setSpendAmount("");
@@ -104,22 +101,20 @@ export default function GatewayPanel() {
         Deposit to Gateway
       </button>
 
-      <h3 className="section-title">2 · Spend instantly on any chain</h3>
-      <p className="hint" style={{ marginTop: 0, marginBottom: 12, textAlign: "left" }}>
-        The SDK picks the source chain(s) automatically from your unified balance — just choose where it lands.
-      </p>
-      <select value={spendToChain} onChange={(e) => setSpendToChain(e.target.value)} className="field-input">
-        {CHAINS.map((c) => (
-          <option key={c.id} value={c.id}>{c.label}</option>
-        ))}
-      </select>
-      <input
-        type="text"
-        placeholder={account?.address ? `${account.address} (your wallet)` : "Recipient address (0x...)"}
-        value={recipientAddress}
-        onChange={(e) => setRecipientAddress(e.target.value)}
-        className="field-input"
-      />
+      <h3 className="section-title">2 · Access it instantly on any chain</h3>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <select value={spendFromChain} onChange={(e) => setSpendFromChain(e.target.value)} className="field-input" style={{ marginBottom: 0 }}>
+          {CHAINS.map((c) => (
+            <option key={c.id} value={c.id}>{c.label}</option>
+          ))}
+        </select>
+        <span style={{ color: "#999" }}>→</span>
+        <select value={spendToChain} onChange={(e) => setSpendToChain(e.target.value)} className="field-input" style={{ marginBottom: 0 }}>
+          {CHAINS.map((c) => (
+            <option key={c.id} value={c.id}>{c.label}</option>
+          ))}
+        </select>
+      </div>
       <input
         type="number"
         placeholder="0.00"
@@ -127,7 +122,7 @@ export default function GatewayPanel() {
         onChange={(e) => setSpendAmount(e.target.value)}
         className="field-input"
       />
-      <button onClick={handleSpend} disabled={busy || !spendAmount || !(recipientAddress || account?.address)} className="btn btn--ink btn--full">
+      <button onClick={handleSpend} disabled={busy || spendFromChain === spendToChain || !spendAmount} className="btn btn--ink btn--full">
         {busy ? "Working…" : "Spend Instantly (<500ms)"}
       </button>
 
